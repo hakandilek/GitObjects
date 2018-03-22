@@ -1,15 +1,15 @@
 ### GitObjects
 
-It all started with [an excellent article](https://hackernoon.com/https-medium-com-zspajich-understanding-git-data-model-95eb16cc99f5) on .git/objects
+It all started with [an excellent article](https://hackernoon.com/https-medium-com-zspajich-understanding-git-data-model-95eb16cc99f5) on .git/objects -- I had to try it myself!
 
-It worked but the story was incomplete: Most Git objects are packed!
+It worked fine, but the story is incomplete: Most Git objects are packed!
 
 
 ### GitInspector
 
 Rather than trying to unpack objects, Git should do the work -- use `java.lang.ProcessBuilder` 
 
-**Usage:** Compile the java file and copy `GitInspector.class` to the root of your repo
+**Usage:** Compile the java file and copy `GitInspector.class` to the root of any Git repo
 ````
 $ java GitInspector 
 88f4044ecf7f20aba666136072bd4f0132c28f0d
