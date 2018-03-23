@@ -4,8 +4,15 @@ import java.text.SimpleDateFormat;
 class GitInspector {
 
     final File root; //git repository
-    public GitInspector() {
-        root = new File(".").getAbsoluteFile();
+    final ProcessBuilder PB;
+    final static String LINE = "==============================";
+    final static SimpleDateFormat 
+        FORM = new SimpleDateFormat("dd/MM/yyyy HH:mm");
+
+    public GitInspector() { this(new File(".")); }
+    public GitInspector(File f) {
+        root = f.isDirectory()? f.getAbsoluteFile(): f.getParentFile();
+        PB = new ProcessBuilder(); PB.directory(root);
         File obj = new File(new File(root, ".git"), "objects");
         if (!obj.isDirectory()) 
             throw new RuntimeException(root+": not a Git repository");
@@ -20,7 +27,7 @@ class GitInspector {
             if (s.startsWith(str)) return s;
         return null;
     }
-    public String reportCommit(String h) { //returns parent
+    public String displayCommit(String h) { //returns parent
         String data = getData(h);
         //System.out.println(data);
         String[] a = data.split("\n");
@@ -44,55 +51,44 @@ class GitInspector {
         System.out.println(LINE+LINE);
         return (parent == null? null : parent.substring(7));
     }
-    public void reportTree(String h) {
+    public void printData(String h) {
         System.out.println(getData(h));
     }
-    public void reportBlob(String h) {
-        String data = getData(h);
-        int n = data.length();
-        System.out.println(n<200? data : n+" bytes");
-    }
-    public void allCommits() {
-        String m = master(); System.out.println(m);
-        while (m != null) m = reportCommit(m);
+    public void displayAllCommits() {
+        String m = head(); System.out.println(m);
+        while (m != null) m = displayCommit(m);
     }
     public String getData(String h) { //4 digits may suffice
         String[] CATF = {"git", "cat-file", "-p", h} ;
         return exec(CATF);
     }
-    public String master() {
+    public String head() {
         String[] HEAD = {"git", "rev-parse", "HEAD"};
         return exec(HEAD).substring(0, 40);  //skip LF
     }
-    
-    final static String LINE = "==============================";
-    final static SimpleDateFormat 
-        FORM = new SimpleDateFormat("dd/MM/yyyy HH:mm");
-    final static ProcessBuilder PB = new ProcessBuilder();
-    
-    public static String exec(String[] a) {
+    public String exec(String[] a) {
         try { 
             //Process p = Runtime.getRuntime().exec(a);
             PB.command(a); Process p = PB.start();
-            InputStream in  = p.getInputStream();
-            InputStream err = p.getErrorStream();
-            int i = 0;
-            while (in.available()==0 && err.available()==0 && i<100) {
-                Thread.sleep(5); i++;  //wait at most 500 msec
-            }
-            //System.out.println((2*n)+" msec waiting");
-            int n = in.available();
-            if (n == 0) return null;
-            byte[] buf = new byte[in.available()];
-            n = in.read(buf);
-            return new String(buf, 0, n);
-        }
-        catch (Exception x) {
-            System.out.println(x); return null;
+            p.waitFor();
+        
+            String e = toString(p.getErrorStream());
+            if (e != null) throw new RuntimeException(e);
+            return toString(p.getInputStream());
+        } catch (Exception x) {
+            throw new RuntimeException(x);
         }
     }
+    
+    static String toString(InputStream in) throws IOException {
+        int n = in.available();
+        if (n == 0) return null;
+        byte[] buf = new byte[n];
+        n = in.read(buf);            
+        return new String(buf, 0, n);
+    }
     public static void main(String[] args) {
-        new GitInspector().allCommits();
+        new GitInspector().displayAllCommits();
     }
 }
 
