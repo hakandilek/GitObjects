@@ -1,4 +1,5 @@
 import java.io.*;
+import java.util.*;
 import java.text.SimpleDateFormat;
 
 class GitInspector {
@@ -27,33 +28,43 @@ class GitInspector {
             if (s.startsWith(str)) return s;
         return null;
     }
-    public String displayCommit(String h) { //returns parent
+    public Git.Commit displayCommit(String h) {
         String data = getData(h);
         //System.out.println(data);
         String[] a = data.split("\n");
         String name = commitName(a);
         String author = findString("author", a);
+        long time = 0;
         if (author != null) {
             int k = author.length();
             String timeStr = author.substring(k-16, k-6);
-            long time = 1000*Long.parseLong(timeStr); //msec
-            System.out.println(FORM.format(time)+"  "+name); 
+            time = 1000*Long.parseLong(timeStr); //msec
+            System.out.println(FORM.format(time)+"  "+name);
         }
         String tree = findString("tree", a);
         if (tree != null) {
             System.out.print(tree.substring(0, 11)+"  "); //no LF
-            String[] t = getData(tree.substring(5)).split("\n");
+            tree = tree.substring(5);
+            String[] t = getData(tree).split("\n");
             System.out.print(t.length+" items ***  ");
+            tree = Git.trim(tree);
         }
         String parent = findString("parent", a);
         if (parent == null) System.out.println();
-        else System.out.println(parent.substring(0, 13));
+        else {
+            System.out.println(parent.substring(0, 14));
+            parent = parent.substring(7, 14);
+        }
         System.out.println(LINE+LINE);
-        return (parent == null? null : parent.substring(7));
+        return 
+            new Git.Commit(h, name, tree, time, parent);
     }
-    public void displayAllCommits() {
+    public Git.Commit[] displayAllCommits() {
         String m = head(); System.out.println(m);
-        while (m != null) m = displayCommit(m);
+        List<Git.Commit> L = new ArrayList<>();
+        Git.Commit c = displayCommit(m); L.add(c);
+        while (c.parent != null) L.add(c = displayCommit(c.parent));
+        return L.toArray(new Git.Commit[0]);
     }
     public void printData(String h) {
         System.out.println(getData(h));
@@ -66,16 +77,27 @@ class GitInspector {
         String[] HEAD = {"git", "rev-parse", "HEAD"};
         return exec(HEAD).substring(0, 40);  //skip LF
     }
-    public void displayTree(String h) {
+    public Git.Tree displayTree(String h) {  //top level has no parent
+        return displayTree(h, "root", null); 
+    }
+    Git.Tree displayTree(String h, String n, Git.Tree p) {
         String[] TREE = {"git", "ls-tree", "-l", "--abbrev", h};
-        String data = exec(TREE);
-        for (String s : data.split("\n")) {
-            int k = s.indexOf(32);   //space
-            k = s.indexOf(32, k+1);  //second space
-            int p = s.indexOf(9, k); //TAB
-            String name = s.substring(p+1);
-            System.out.println(s.substring(k+1));
+        String data = exec(TREE);    //abbrev default to 7 chars
+        String[] sa = data.split("\n"); 
+        Git.Tree gt = new Git.Tree(h, n, p);
+        for (String s : sa) { 
+            int k = s.indexOf(32);   //find space
+            int i = s.indexOf(32, k+1); //second space
+            int j = s.indexOf(9, i+1);  //find TAB
+            String hash = s.substring(i+1, i+1+Git.M);
+            String size = s.substring(j-Git.M, j);
+            String name = s.substring(j+1);
+            System.out.println(hash+" "+size+" "+name); //s.substring(k+1));
+            gt.add(  s.charAt(j-1) == '-'?
+              displayTree(hash, name, gt) : 
+              new Git.Blob(hash, name, gt, size));
         }
+        return gt;
     }
     public void execute(String... a) {
         System.out.println(exec(a));
