@@ -19,7 +19,7 @@ class GitInspector {
     }
     String commitName(String[] a) {
         for (int i=0; i<a.length; i++) 
-            if (a[i].equals("")) return a[i+1];
+            if (a[i].length() == 0) return a[i+1];
         return null;
     }
     String findString(String str, String[] a) {
@@ -51,38 +51,54 @@ class GitInspector {
         System.out.println(LINE+LINE);
         return (parent == null? null : parent.substring(7));
     }
-    public void printData(String h) {
-        System.out.println(getData(h));
-    }
     public void displayAllCommits() {
         String m = head(); System.out.println(m);
         while (m != null) m = displayCommit(m);
     }
+    public void printData(String h) {
+        System.out.println(getData(h));
+    }
     public String getData(String h) { //4 digits may suffice
-        String[] CATF = {"git", "cat-file", "-p", h} ;
+        String[] CATF = {"git", "cat-file", "-p", h};
         return exec(CATF);
     }
     public String head() {
         String[] HEAD = {"git", "rev-parse", "HEAD"};
         return exec(HEAD).substring(0, 40);  //skip LF
     }
-    public String exec(String[] a) {
+    public void displayTree(String h) {
+        String[] TREE = {"git", "ls-tree", "-l", "--abbrev", h};
+        String data = exec(TREE);
+        for (String s : data.split("\n")) {
+            int k = s.indexOf(32);   //space
+            k = s.indexOf(32, k+1);  //second space
+            int p = s.indexOf(9, k); //TAB
+            String name = s.substring(p+1);
+            System.out.println(s.substring(k+1));
+        }
+    }
+    public void execute(String... a) {
+        System.out.println(exec(a));
+    }
+    String exec(String... a) {
+        String out, err;
         try { 
             //Process p = Runtime.getRuntime().exec(a);
             PB.command(a); Process p = PB.start();
             p.waitFor();
-        
-            String e = toString(p.getErrorStream());
-            if (e != null) throw new RuntimeException(e);
-            return toString(p.getInputStream());
+            
+            out = toString(p.getInputStream());
+            err = toString(p.getErrorStream());         
         } catch (Exception x) {
             throw new RuntimeException(x);
         }
+        if (out.length() > 0) return out; 
+        throw new RuntimeException(err);
     }
     
-    static String toString(InputStream in) throws IOException {
+    public static String toString(InputStream in) throws IOException {
         int n = in.available();
-        if (n == 0) return null;
+        if (n == 0) return "";
         byte[] buf = new byte[n];
         n = in.read(buf);            
         return new String(buf, 0, n);
