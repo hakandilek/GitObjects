@@ -37,8 +37,9 @@ class GitInspector {
         long time = 0;
         if (author != null) {
             int k = author.length();
-            String timeStr = author.substring(k-16, k-6);
-            time = 1000*Long.parseLong(timeStr); //msec
+            String tStr = author.substring(k-16, k-6);
+            while (tStr.startsWith(" ")) tStr = tStr.substring(1);
+            time = 1000*Long.parseLong(tStr); //msec
             System.out.println(FORM.format(time)+"  "+name);
         }
         String tree = findString("tree", a);
