@@ -2,7 +2,7 @@ import java.io.*;
 import java.text.SimpleDateFormat;
 import java.util.zip.InflaterInputStream;
 
-class GitObjects {
+class SimpleObjects {
 
     final File root; //git repository
     final File obj;  //git objects are in this folder
@@ -11,7 +11,8 @@ class GitObjects {
     final static SimpleDateFormat 
         FORM = new SimpleDateFormat("dd/MM/yyyy HH:mm");
     
-    public GitObjects(File f) {
+    public SimpleObjects() { this(new File(".")); }
+    public SimpleObjects(File f) {
         root = f.isDirectory()? f.getAbsoluteFile(): f.getParentFile();
         obj = new File(new File(root, ".git"), "objects");
         if (!obj.isDirectory()) 
@@ -114,7 +115,7 @@ class GitObjects {
         //String d = "/home/maeyler/github/hackernoon/.git/objects/af";
         //String n = "2c47da3037fada6f53bb3e9f838160a636b5cb";
         //G.decode(new File(d, n));
-        GitObjects G = new GitObjects(new File("."));
+        SimpleObjects G = new SimpleObjects();
         String m = G.master(); System.out.println(m);
         G.decode(m);
     }
