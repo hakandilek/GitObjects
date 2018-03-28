@@ -6,7 +6,7 @@ class GitInspector {
 
     final File root; //git repository
     final ProcessBuilder PB;
-    final static String LINE = "==============================";
+    final static String LINE = "============================";
     final static SimpleDateFormat 
         FORM = new SimpleDateFormat("dd/MM/yyyy HH:mm");
 
@@ -97,7 +97,7 @@ class GitInspector {
             System.out.println(hash+" "+size+" "+name); //s.substring(k+1));
             gt.add(  s.charAt(j-1) == '-'?
               displayTree(hash, name, gt) : 
-              new Git.Blob(hash, name, gt, size));
+              new Git.Blob(hash, name, gt, size, getData(hash)));
         }
         return gt;
     }
@@ -119,21 +119,38 @@ class GitInspector {
         if (out.length > 0) return out; 
         throw new RuntimeException(new String(err));
     }
-    
-    public static void saveToFile(byte[] b, String f) throws IOException {
-        OutputStream out = new FileOutputStream(f);
-        out.write(b); out.close();
+    public boolean verifyAllBlobs(Git.Commit c) {
+        String h = c.hash; Git.count = 0; Git.pass = 0; 
+        displayTree(c.tree).verify();
+        System.out.println(Git.count+" blobs, "+Git.pass+" OK");
+        return Git.count == Git.pass;
     }
-    public static byte[] toArray(InputStream in) throws IOException {
-        int n = in.available();
-        if (n == 0) return new byte[0];
-        byte[] buf = new byte[n];
-        n = in.read(buf);
-        if (n == buf.length) return buf;
-        else return Arrays.copyOf(buf, n);
+    public void saveAllBlobs(Git.Commit c, String name) {
+        saveAllBlobs(c, root);
+    }
+    public void saveAllBlobs(Git.Commit c, File f) {
+        if (f.exists()) 
+            throw new RuntimeException("cannot overwrite "+f);
+        String h = c.hash; Git.count = 0;
+        displayTree(c.tree).saveTo(f);
+        System.out.println(Git.count+" blobs written");
+    }
+    
+    public static byte[] toArray(InputStream in) {
+        try {
+            int n = in.available();
+            if (n == 0) return new byte[0];
+            byte[] buf = new byte[n];
+            n = in.read(buf);
+            if (n == buf.length) return buf;
+            else return Arrays.copyOf(buf, n);
+        } catch (IOException x) {
+            throw new RuntimeException(x);
+        }
     }
     public static void main(String[] args) {
-        new GitInspector().displayAllCommits();
+        GitInspector G = new GitInspector();
+        G.verifyAllBlobs(G.displayCommit(G.head()));
     }
 }
 

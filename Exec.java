@@ -63,10 +63,16 @@ class Exec {
         System.out.println(s+"  "+s.equals(h));
     }
     public void saveBlob(String h, String name) throws IOException {
-        byte[] ba = getData(h);
-        String s = toSHA(ba);
-        System.out.println(s+"  "+s.equals(h));
-        saveToFile(ba, new File(name));
+        byte[] b = getData(h);
+        String t = "blob "+b.length;
+        byte[] a = t.getBytes();
+        byte[] ab = new byte[a.length+1+b.length];
+        System.arraycopy(a, 0 ,ab, 0, a.length);  //char 0
+        System.arraycopy(b, 0 ,ab, a.length+1, b.length);
+        String s = toSHA(ab);
+        System.out.println(h+"  "+t+"="+b.length);
+        System.out.println(s+"  "+s.startsWith(h));
+        saveToFile(b, new File(name));
     }
     
     static void saveToFile(byte[] b, File f) throws IOException {
@@ -98,4 +104,3 @@ class Exec {
         G.execute("dir"); //sample shell command
     }
 }
-
