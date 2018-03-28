@@ -29,7 +29,7 @@ class GitInspector {
         return null;
     }
     public Git.Commit displayCommit(String h) {
-        String data = getData(h);
+        String data = new String(getData(h));
         //System.out.println(data);
         String[] a = data.split("\n");
         String name = commitName(a);
@@ -46,7 +46,7 @@ class GitInspector {
         if (tree != null) {
             System.out.print(tree.substring(0, 11)+"  "); //no LF
             tree = tree.substring(5);
-            String[] t = getData(tree).split("\n");
+            String[] t = new String(getData(tree)).split("\n");
             System.out.print(t.length+" items ***  ");
             tree = Git.trim(tree);
         }
@@ -68,22 +68,23 @@ class GitInspector {
         return L.toArray(new Git.Commit[0]);
     }
     public void printData(String h) {
-        System.out.println(getData(h));
+        for (byte b : getData(h)) System.out.print((char)b);
+        System.out.println();
     }
-    public String getData(String h) { //4 digits may suffice
+    public byte[] getData(String h) { //4 digits may suffice
         String[] CATF = {"git", "cat-file", "-p", h};
         return exec(CATF);
     }
     public String head() {
         String[] HEAD = {"git", "rev-parse", "HEAD"};
-        return exec(HEAD).substring(0, 40);  //skip LF
+        return new String(exec(HEAD), 0, 40);  //skip LF
     }
     public Git.Tree displayTree(String h) {  //top level has no parent
         return displayTree(h, "root", null); 
     }
     Git.Tree displayTree(String h, String n, Git.Tree p) {
         String[] TREE = {"git", "ls-tree", "-l", "--abbrev", h};
-        String data = exec(TREE);    //abbrev default to 7 chars
+        String data = new String(exec(TREE));
         String[] sa = data.split("\n"); 
         Git.Tree gt = new Git.Tree(h, n, p);
         for (String s : sa) { 
@@ -101,30 +102,35 @@ class GitInspector {
         return gt;
     }
     public void execute(String... a) {
-        System.out.println(exec(a));
+        System.out.println(new String(exec(a)));
     }
-    String exec(String... a) {
-        String out, err;
+    byte[] exec(String... a) {
+        byte[] out, err;
         try { 
             //Process p = Runtime.getRuntime().exec(a);
             PB.command(a); Process p = PB.start();
             p.waitFor();
             
-            out = toString(p.getInputStream());
-            err = toString(p.getErrorStream());         
+            out = toArray(p.getInputStream());
+            err = toArray(p.getErrorStream());         
         } catch (Exception x) {
             throw new RuntimeException(x);
         }
-        if (out.length() > 0) return out; 
-        throw new RuntimeException(err);
+        if (out.length > 0) return out; 
+        throw new RuntimeException(new String(err));
     }
     
-    public static String toString(InputStream in) throws IOException {
+    public static void saveToFile(byte[] b, String f) throws IOException {
+        OutputStream out = new FileOutputStream(f);
+        out.write(b); out.close();
+    }
+    public static byte[] toArray(InputStream in) throws IOException {
         int n = in.available();
-        if (n == 0) return "";
+        if (n == 0) return new byte[0];
         byte[] buf = new byte[n];
-        n = in.read(buf);            
-        return new String(buf, 0, n);
+        n = in.read(buf);
+        if (n == buf.length) return buf;
+        else return Arrays.copyOf(buf, n);
     }
     public static void main(String[] args) {
         new GitInspector().displayAllCommits();
