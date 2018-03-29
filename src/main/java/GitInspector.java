@@ -1,10 +1,31 @@
-import java.io.*;
-import java.util.*;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Date;
+import java.util.List;
+import java.util.stream.Collectors;
+
+import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.errors.RevisionSyntaxException;
+import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.PersonIdent;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.revwalk.RevTree;
+import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 
 class GitInspector {
 
     final File root; //git repository
+    final Repository repository;
+    final org.eclipse.jgit.api.Git git;
+
     final ProcessBuilder PB;
     final static String LINE = "==============================";
     final static SimpleDateFormat 
@@ -14,9 +35,13 @@ class GitInspector {
     public GitInspector(File f) {
         root = f.isDirectory()? f.getAbsoluteFile(): f.getParentFile();
         PB = new ProcessBuilder(); PB.directory(root);
-        File obj = new File(new File(root, ".git"), "objects");
-        if (!obj.isDirectory()) 
+        FileRepositoryBuilder builder = new FileRepositoryBuilder();
+		try {
+			repository = builder.setGitDir(new File(root, ".git")).readEnvironment().findGitDir().build();
+			git = new org.eclipse.jgit.api.Git(repository);
+		} catch (IOException e) {
             throw new RuntimeException(root+": not a Git repository");
+		}
     }
     String commitName(String[] a) {
         for (int i=0; i<a.length; i++) 
@@ -60,14 +85,39 @@ class GitInspector {
         return 
             new Git.Commit(h, name, tree, time, parent);
     }
-    public Git.Commit[] displayAllCommits() {
-        String m = head(); System.out.println(m);
-        List<Git.Commit> L = new ArrayList<>();
-        Git.Commit c = displayCommit(m); L.add(c);
-        while (c.parent != null) L.add(c = displayCommit(c.parent));
-        return L.toArray(new Git.Commit[0]);
+    public RevCommit[] displayAllCommits() {
+        ObjectId m = head(); System.out.println(m.name());
+        List<RevCommit> L = new ArrayList<>();
+        try {
+			Iterable<RevCommit> commits = git.log().add(m).call();
+			commits.forEach((c) -> {
+    			displayCommit(c); L.add(c);
+    		});
+		} catch (GitAPIException | IOException e) {
+			System.err.println("cannot iterate commits");
+		}
+        return L.toArray(new RevCommit[0]);
     }
-    public void printData(String h) {
+    private void displayCommit(RevCommit c) {
+    	PersonIdent id = c.getAuthorIdent();
+    	Date time = id.getWhen();
+        String name = c.getShortMessage();
+		System.out.println(FORM.format(time)+"  "+name);
+		RevTree tree = c.getTree();
+        if (tree != null) {
+        	System.out.print(Constants.typeString(tree.getType()) + " "); //no LF 
+        	System.out.print(tree.getName().substring(0, 6)+"  ");
+            System.out.print("? items ***  "); //TODO: item count
+		}
+        RevCommit[] parents = c.getParents();
+        if (parents == null || parents.length == 0) System.out.println();
+        else {
+			String ps = Arrays.stream(parents).map(p -> p.getName().substring(0, 6)).collect(Collectors.joining(" "));
+            System.out.println("parent " + ps);
+        }
+        System.out.println(LINE+LINE);
+	}
+	public void printData(String h) {
         for (byte b : getData(h)) System.out.print((char)b);
         System.out.println();
     }
@@ -75,9 +125,14 @@ class GitInspector {
         String[] CATF = {"git", "cat-file", "-p", h};
         return exec(CATF);
     }
-    public String head() {
-        String[] HEAD = {"git", "rev-parse", "HEAD"};
-        return new String(exec(HEAD), 0, 40);  //skip LF
+    public ObjectId head() {
+    	try {
+			ObjectId head = repository.resolve(Constants.HEAD);
+			return head;
+		} catch (RevisionSyntaxException | IOException e) {
+			System.err.println("no HEAD found");
+			return null;
+		}
     }
     public Git.Tree displayTree(String h) {  //top level has no parent
         return displayTree(h, "root", null); 
