@@ -3,7 +3,7 @@ buildscript {
         jcenter()
     }
     dependencies {
-        classpath 'com.github.jengelman.gradle.plugins:shadow:2.0.3'
+        classpath 'com.github.jengelman.gradle.plugins:shadow:2.+'
     }
 }
 
@@ -15,7 +15,7 @@ apply plugin: 'com.github.johnrengelman.shadow'
 mainClassName = 'GitInspector'
 
 dependencies {
-    compile group: 'org.eclipse.jgit', name: 'org.eclipse.jgit', version: '4.10.0.201712302008-r'
+    compile 'org.eclipse.jgit:org.eclipse.jgit:4.10.+'
 }
 
 repositories {
