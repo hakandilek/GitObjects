@@ -9,9 +9,9 @@ It worked fine, but the story is incomplete: Most Git objects are packed!
 
 Rather than trying to unpack objects, Git should do the work -- use `java.lang.ProcessBuilder` 
 
-**Usage:** Compile the java file and copy `GitInspector.class` to the root of any Git repo
+**Usage:** Build application using Gradle command `gradlew build` and copy `build\libs\GitObjects-all.jar` to the root of any Git repo
 ````
-$ java GitInspector 
+$ java -jar GitObjects-all.jar 
 88f4044ecf7f20aba666136072bd4f0132c28f0d
 21/03/2018 17:18  GitObjects.java
 tree 91ea30  4 items ***  parent e4f4d0
