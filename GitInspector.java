@@ -1,6 +1,7 @@
 import java.io.*;
 import java.util.*;
 import java.text.SimpleDateFormat;
+import java.util.concurrent.TimeUnit;
 
 class GitInspector {
 
@@ -28,7 +29,7 @@ class GitInspector {
             if (s.startsWith(str)) return s;
         return null;
     }
-    public Git.Commit displayCommit(String h) {
+    public Git.Commit getCommit(String h) {
         String data = new String(getData(h));
         //System.out.println(data);
         String[] a = data.split("\n");
@@ -60,11 +61,11 @@ class GitInspector {
         return 
             new Git.Commit(h, name, tree, time, parent);
     }
-    public Git.Commit[] displayAllCommits() {
+    public Git.Commit[] getAllCommits() {
         String m = head(); System.out.println(m);
         List<Git.Commit> L = new ArrayList<>();
-        Git.Commit c = displayCommit(m); L.add(c);
-        while (c.parent != null) L.add(c = displayCommit(c.parent));
+        Git.Commit c = getCommit(m); L.add(c);
+        while (c.parent != null) L.add(c = getCommit(c.parent));
         return L.toArray(new Git.Commit[0]);
     }
     public void printData(String h) {
@@ -79,10 +80,10 @@ class GitInspector {
         String[] HEAD = {"git", "rev-parse", "HEAD"};
         return new String(exec(HEAD), 0, 40);  //skip LF
     }
-    public Git.Tree displayTree(String h) {  //top level has no parent
-        return displayTree(h, "root", null); 
+    public Git.Tree makeTree(String h) {  //top level has no parent
+        return makeTree(h, "root", null); 
     }
-    Git.Tree displayTree(String h, String n, Git.Tree p) {
+    Git.Tree makeTree(String h, String n, Git.Tree p) {
         String[] TREE = {"git", "ls-tree", "-l", "--abbrev", h};
         String data = new String(exec(TREE));
         String[] sa = data.split("\n"); 
@@ -96,7 +97,7 @@ class GitInspector {
             String name = s.substring(j+1);
             System.out.println(hash+" "+size+" "+name); //s.substring(k+1));
             gt.add(  s.charAt(j-1) == '-'?
-              displayTree(hash, name, gt) : 
+              makeTree(hash, name, gt) : 
               new Git.Blob(hash, name, gt, size, getData(hash)));
         }
         return gt;
@@ -109,7 +110,7 @@ class GitInspector {
         try { 
             //Process p = Runtime.getRuntime().exec(a);
             PB.command(a); Process p = PB.start();
-            p.waitFor();
+            p.waitFor(2, TimeUnit.SECONDS);
             
             out = toArray(p.getInputStream());
             err = toArray(p.getErrorStream());         
@@ -119,20 +120,34 @@ class GitInspector {
         if (out.length > 0) return out; 
         throw new RuntimeException(new String(err));
     }
+/*  reading large data:
+p2 = PB.start();
+p2.isAlive(); //--> true
+stdout = p2.stdout;
+stdout.available(); //--> 65536
+b = Menu.newArray("byte", 65536); //--> byte[65536]
+stdout.read(b); //--> 65536
+stdout.available(); //--> 736
+p2.isAlive(); //--> false
+p2.exitValue(); //--> 0
+stdout.read(b); //--> 736
+stdout.available(); //--> 0
+*/
     public boolean verifyAllBlobs(Git.Commit c) {
-        String h = c.hash; Git.count = 0; Git.pass = 0; 
-        displayTree(c.tree).verify();
+        Git.count = 0; Git.pass = 0;
+        if (!c.dataIsRead()) c.data = makeTree(c.hTree);
+        c.data.verify();
         System.out.println(Git.count+" blobs, "+Git.pass+" OK");
         return Git.count == Git.pass;
     }
-    public void saveAllBlobs(Git.Commit c, String name) {
+    public void saveAllBlobs(Git.Commit c) {
         saveAllBlobs(c, root);
     }
-    public void saveAllBlobs(Git.Commit c, File f) {
-        if (f.exists()) 
-            throw new RuntimeException("cannot overwrite "+f);
-        String h = c.hash; Git.count = 0;
-        displayTree(c.tree).saveTo(f);
+    public void saveAllBlobs(Git.Commit c, File d) {
+        //if (!f.isDirectory()) f = f.getParentFile();
+        Git.count = 0;
+        if (!c.dataIsRead()) c.data = makeTree(c.hTree);
+        c.data.saveTo(d);
         System.out.println(Git.count+" blobs written");
     }
     
@@ -150,7 +165,7 @@ class GitInspector {
     }
     public static void main(String[] args) {
         GitInspector G = new GitInspector();
-        G.verifyAllBlobs(G.displayCommit(G.head()));
+        G.verifyAllBlobs(G.getCommit(G.head()));
     }
 }
 

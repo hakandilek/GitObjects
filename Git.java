@@ -45,11 +45,12 @@ class Git {
     }
 
     static class Commit {
-       String hash, name, tree; 
+       String hash, name, hTree; Tree data;
        long time; String parent;
        Commit(String h, String n, String x, long t, String p) { 
-          hash = trim(h); name = n; tree = x; time = t; parent = p; 
+          hash = trim(h); name = n; hTree = x; time = t; parent = p; 
        }
+       public boolean dataIsRead() { return data != null; }
        public String toString() { return hash+" "+name; }
     }
     static abstract class Entry implements TreeNode {
@@ -59,9 +60,10 @@ class Git {
        }
        public boolean getAllowsChildren() { return !isLeaf(); }
        public TreeNode getParent() { return parent; }
-       public java.util.Enumeration	children() { return null; }
-       public abstract boolean verify();
-       public abstract void saveTo(File f);
+       public java.util.Enumeration children() { return null; }
+       public abstract boolean dataIsRead();
+       public abstract void verify();
+       public abstract void saveTo(File dir);
     }
     static class Blob extends Entry {
        String size; byte[] data;
@@ -73,7 +75,8 @@ class Git {
        public int getChildCount() { return 0; }
        public TreeNode getChildAt(int i) { return null; }
        public String toString() { return hash+" "+size+" - "+name; }
-       public boolean verify() {
+       public boolean dataIsRead() { return data != null; }
+       public void verify() {
            byte[] b = data; count++;
            String t = "blob "+b.length;
            byte[] a = t.getBytes();
@@ -84,12 +87,11 @@ class Git {
            boolean OK = s.startsWith(hash);
            if (OK) pass++;
            System.out.println(hash+size+" "+OK+" "+name);
-           return OK;
        }
-       public void saveTo(File f) {
+       public void saveTo(File d) {
            byte[] b = data; count++;
-           System.out.println(hash+"  "+"="+b.length);
-           saveToFile(b, new File(f, name));
+           System.out.println(hash+size+" = "+b.length+" "+name);
+           saveToFile(b, new File(d, name));
        }
     }
     static class Tree extends Entry {
@@ -101,14 +103,18 @@ class Git {
        public int getChildCount() { return list.size(); }
        public TreeNode getChildAt(int i) { return list.get(i); }
        public String toString() { return hash+" "+name+": "+list.size(); }
-       public boolean verify() {
+       public boolean dataIsRead() { return list != null; }
+       public void verify() {
            for (Entry e : list) e.verify();
-           return true;
        }
-       public void saveTo(File f) {
-           if (f.exists() || !f.mkdir()) return;
-           for (Entry e : list) 
-               e.saveTo(new File(f, name));
+       public void saveTo(File d) {
+           File f = new File(d, name);
+           System.out.println(hash+"  "+f);
+           if (f.exists()) 
+             throw new RuntimeException("cannot overwrite "+f);
+           if (!f.mkdir()) 
+             throw new RuntimeException("cannot mkdir "+f);
+           for (Entry e : list) e.saveTo(f);
        }
     }
 }
