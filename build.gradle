@@ -15,7 +15,7 @@ apply plugin: 'com.github.johnrengelman.shadow'
 mainClassName = 'GitInspector'
 
 dependencies {
-    // compile 'org.eclipse.jgit:org.eclipse.jgit:4.10.+'
+    compile 'org.eclipse.jgit:org.eclipse.jgit:4.10.+'
 }
 
 repositories {
