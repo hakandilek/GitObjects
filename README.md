@@ -9,7 +9,11 @@ It worked fine, but the story is incomplete: Most Git objects are packed!
 
 Rather than trying to unpack objects, Git should do the work -- use `java.lang.ProcessBuilder` 
 
-**Usage:** Build application using Gradle command `gradlew build` and copy `build\libs\GitObjects-all.jar` to the root of any Git repo
+**Usage:** 
+1. Build application using Gradle command `gradlew build` 
+2. Copy `build\libs\GitObjects-all.jar` to the root of any Git repo
+
+The output of the program on *this repo*, when it had only three commits:
 ````
 $ java -jar GitObjects-all.jar 
 88f4044ecf7f20aba666136072bd4f0132c28f0d
