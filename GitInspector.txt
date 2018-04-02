@@ -1,23 +1,19 @@
-//we need GitInspector class
+//we need Git class
 Menu.chooser();
-//we need GitInspector class
+//we need Git class
 class mae.sss.Chooser
-//select GitInspector class
+//select Git class
 Chooser.loadClass();
-//select GitInspector class
-class GitInspector
 //new instance
-G = new GitInspector();
+G = new Git();
 //displayAllCommits
-ca = G.displayAllCommits();
+ca = G.getAllCommits();
 //find the HEAD pointer
 h = G.head();
 //find the last commit
-c = G.displayCommit(h);
+c = G.getCommit(h);
 //display its tree
-t = c.tree;
+t = c.getTree();
 //display its tree
-tree = G.displayTree(t);
-//display its tree
-ta = Menu.toTree(tree);
+A = Menu.toTree(t);
 

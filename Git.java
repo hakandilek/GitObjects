@@ -3,7 +3,6 @@ import java.util.*;
 import javax.swing.tree.TreeNode;
 import java.security.MessageDigest;
 import java.text.SimpleDateFormat;
-import java.util.concurrent.TimeUnit;
 
 class Git {
 
@@ -25,44 +24,40 @@ class Git {
         if (!obj.isDirectory()) 
             throw new RuntimeException(root+": not a Git repository");
     }
-    String commitName(String[] a) {
-        for (int i=0; i<a.length; i++) 
-            if (a[i].length() == 0) return a[i+1];
-        return null;
-    }
-    String findString(String str, String[] a) {
-        for (String s : a) 
-            if (s.startsWith(str)) return s;
-        return null;
-    }
     public Commit getCommit(String h) {
-        String data = new String(getData(h));
-        String[] a = data.split("\n");
-        String name = commitName(a);
-        System.out.println(h+"  "+name);
-        String author = findString("author", a);
+        byte[] ba = getData(h); 
+        String[] a = new String(ba).split("\n");
+        int p = 0;
+        String tree = null;
+        if (a[p].startsWith("tree")) {
+            tree = a[p].substring(5, 5+M); p++;
+        }
+        String parent = null;
+        while (a[p].startsWith("parent")) {
+            if (parent == null) parent = a[p].substring(7, 7+M);
+            //else par2 = a[p].substring(7, 7+M);
+            p++;
+        }
+        String author = null;
         long time = 0;
-        if (author != null) {
-            int k = author.length();
-            String tStr = author.substring(k-16, k-6);
-            while (tStr.startsWith(" ")) tStr = tStr.substring(1);
+        if (a[p].startsWith("author")) {
+            int j = a[p].indexOf("<");
+            author = a[p].substring(7, j-1); 
+            int k = a[p].length();
+            int i = k - 16;
+            while (a[p].charAt(i) == ' ') i++;
+            String tStr = a[p].substring(i, k-6);
             time = 1000*Long.parseLong(tStr); //msec
-            System.out.println(FORM.format(time)+"  "+name);
+            p++;
         }
-        String tree = findString("tree", a);
-        if (tree != null) {
-            System.out.print(tree.substring(0, 11)+"  "); //no LF
-            tree = tree.substring(5);
-            String[] t = new String(getData(tree)).split("\n");
-            System.out.print(t.length+" items ***  ");
-            tree = trim(tree);
-        }
-        String parent = findString("parent", a);
-        if (parent == null) System.out.println();
-        else {
-            System.out.println(parent.substring(0, 14));
-            parent = parent.substring(7, 14);
-        }
+        while (a[p].length() > 0) p++;
+        String name = a[p+1];
+        
+        System.out.println("commit "+trim(h)+"    "+name);
+        System.out.println(FORM.format(time)+"  "+author);
+        System.out.print("parent "+parent+"    ");
+        String[] t = new String(getData(tree)).split("\n");
+        System.out.println("tree "+tree+"  "+t.length+" items");
         System.out.println(LINE+LINE);
         return new Commit(h, name, tree, time, parent);
     }
@@ -75,9 +70,6 @@ class Git {
             c.parent = p; L.add(p); c = p;
         }
         return L.toArray(new Commit[0]);
-    }
-    public void saveAllBlobs(Commit c) {
-        c.saveTo(root);
     }
     public void printData(String h) {
         for (byte b : getData(h)) System.out.print((char)b);
@@ -95,6 +87,7 @@ class Git {
         return makeTree(h, "root", null); 
     }
     Tree makeTree(String h, String n, Tree p) {
+        System.out.println(h+" "+n);
         String[] TREE = {"git", "ls-tree", "-l", "--abbrev", h};
         String data = new String(exec(TREE));
         String[] sa = data.split("\n"); 
@@ -106,7 +99,7 @@ class Git {
             String hash = s.substring(i+1, i+1+M);
             String size = s.substring(j-M, j);
             String name = s.substring(j+1);
-            System.out.println(hash+" "+size+" "+name); //s.substring(k+1));
+            //System.out.println(hash+" "+size+" "+name);
             gt.add(  s.charAt(j-1) == '-'?
               makeTree(hash, name, gt) : 
               new Blob(hash, name, gt, size, getData(hash)));
@@ -121,7 +114,7 @@ class Git {
         try { 
             //Process p = Runtime.getRuntime().exec(a);
             PB.command(a); Process p = PB.start();
-            p.waitFor(2, TimeUnit.SECONDS);
+            p.waitFor(2, java.util.concurrent.TimeUnit.SECONDS);
             
             out = toArray(p.getInputStream());
             err = toArray(p.getErrorStream());         
@@ -139,6 +132,16 @@ class Git {
        }
        public boolean getAllowsChildren() { return !isLeaf(); }
        public TreeNode getParent() { return parent; }
+       public TreeNode getRoot() { 
+           Entry c = this; 
+           while (!(c instanceof Commit)) {
+               Entry p = c.parent;
+               if (p == null) break;
+               c = p;
+           }
+           return c;
+       }
+       public int getIndex(TreeNode node) { return -1; }
        public java.util.Enumeration children() { return null; }
        public abstract void verify();
        public abstract void saveTo(File dir);
@@ -148,58 +151,40 @@ class Git {
        Commit(String h, String n, String x, long t, String p) {
            super(h, n, null); hTree = x; time = t; hParent = p;
        }
+       public TreeNode getParent() { 
+           if (hParent == null) return null;
+           if (parent == null) parent = getCommit(hParent);
+           return parent;
+       }
+       public Tree getTree() {
+           if (data == null) data = makeTree(hTree);
+           data.parent = this; return data;
+       }
        public boolean isLeaf() { return false; }
-       public int getIndex(TreeNode node) { return -1; }
        public int getChildCount() { return 1; }
-       public TreeNode getChildAt(int i) { return data; }
+       public TreeNode getChildAt(int i) { 
+           return (i == 0? getTree() : null);  //data
+       }
        public String toString() { return hash+" - "+name; }
        public void verify() {
+           //verify bytes by SHA
+           String h = calculateSHA("commit ", getData(hash));
+           System.out.println(hash+" = "+trim(h));
            count = 0; pass = 0;
-           if (data == null) data = makeTree(hTree);
-           data.verify();
+           getTree().verify();
            System.out.println(count+" blobs, "+pass+" OK");
        }
        public void saveTo(File d) { 
            count = 0;
-           if (data == null) data = makeTree(hTree);
-           data.saveTo(d);
+           getTree().saveTo(d);
            System.out.println(count+" blobs written");
-       }
-    }
-    class Blob extends Entry {
-       String size; byte[] data;
-       Blob(String h, String n, Tree p, String s, byte[] d) { 
-           super(h, n, p); size = s; data = d;
-       }
-       public boolean isLeaf() { return true; }
-       public int getIndex(TreeNode node) { return -1; }
-       public int getChildCount() { return 0; }
-       public TreeNode getChildAt(int i) { return null; }
-       public String toString() { return hash+" "+size+" - "+name; }
-       public void verify() {
-           byte[] b = data; count++;
-           String t = "blob "+b.length;
-           byte[] a = t.getBytes();
-           byte[] ab = new byte[a.length+1+b.length];
-           System.arraycopy(a, 0 ,ab, 0, a.length);  //char 0
-           System.arraycopy(b, 0 ,ab, a.length+1, b.length);
-           String s = toSHA(ab);
-           boolean OK = s.startsWith(hash);
-           if (OK) pass++;
-           System.out.println(hash+size+" "+OK+" "+name);
-       }
-       public void saveTo(File d) {
-           byte[] b = data; count++;
-           System.out.println(hash+size+" = "+b.length+" "+name);
-           saveToFile(b, new File(d, name));
        }
     }
     class Tree extends Entry {
        List<Entry> list = new ArrayList<>();
        Tree(String h, String n, Tree p) { super(h, n, p); }
-       public void add(Entry e) { list.add(e); } 
+       void add(Entry e) { list.add(e); } 
        public boolean isLeaf() { return false; }
-       public int getIndex(TreeNode node) { return -1; }
        public int getChildCount() { return list.size(); }
        public TreeNode getChildAt(int i) { return list.get(i); }
        public String toString() { return hash+" "+name+": "+list.size(); }
@@ -216,7 +201,27 @@ class Git {
            for (Entry e : list) e.saveTo(f);
        }
     }
-
+    class Blob extends Entry {
+       String size; byte[] data;
+       Blob(String h, String n, Tree p, String s, byte[] d) { 
+           super(h, n, p); size = s; data = d;
+       }
+       public boolean isLeaf() { return true; }
+       public int getChildCount() { return 0; }
+       public TreeNode getChildAt(int i) { return null; }
+       public String toString() { return hash+" "+size+" - "+name; }
+       public void verify() {
+           count++; 
+           boolean OK = calculateSHA("blob ", data).startsWith(hash);
+           if (OK) pass++;
+           System.out.println(hash+size+" "+OK+" "+name);
+       }
+       public void saveTo(File d) {
+           byte[] b = data; count++;
+           System.out.println(hash+size+" = "+b.length+" "+name);
+           saveToFile(b, new File(d, name));
+       }
+    }
 
     static {
         try { 
@@ -244,6 +249,14 @@ class Git {
     public static String toSHA(String s) {
         return toSHA(s.getBytes()); 
     }
+    public static String calculateSHA(String typ, byte[] b) {
+           String t = typ+b.length;
+           byte[] a = t.getBytes();
+           byte[] ab = new byte[a.length+1+b.length];
+           System.arraycopy(a, 0 ,ab, 0, a.length);  //char 0
+           System.arraycopy(b, 0 ,ab, a.length+1, b.length);
+           return toSHA(ab);
+    }
     public static void saveToFile(byte[] b, File f) {
         try {
             OutputStream out = new FileOutputStream(f);
@@ -265,7 +278,7 @@ class Git {
         }
     }
     public static void main(String[] args) {
-        Git G = new Git(); G.getAllCommits();
-        //G.getCommit(G.head()).verify();
+        Git G = new Git(); //G.getAllCommits();
+        G.getCommit(G.head()).verify();
     }
 }
