@@ -33,11 +33,10 @@ class SimpleObjects {
         int num;  //number of bytes read
         byte[] buf = new byte[2000];
         String kind = "";
-        try {
-            InputStream fis = new FileInputStream(f);
-            InputStream in = new InflaterInputStream(fis);
+        try (InputStream in = new InflaterInputStream(new FileInputStream(f))) {
             char c;
-            while ((c = (char)in.read()) > 0) kind += c;    
+            while ((c = (char) in.read()) > 0)
+                kind += c;
             num = in.read(buf);
         } catch (IOException x) {
             throw new RuntimeException(x);
@@ -103,10 +102,11 @@ class SimpleObjects {
     }
     public static String fileContents(File f) {
         try {
-            InputStream in = new FileInputStream(f);
-            byte[] buf = new byte[in.available()];
-            int n = in.read(buf);
-            return new String(buf, 0, n);
+            try (InputStream in = new FileInputStream(f)) {
+                byte[] buf = new byte[in.available()];
+                int n = in.read(buf);
+                return new String(buf, 0, n);
+            }
         } catch (IOException x) {
             return null;
         }
