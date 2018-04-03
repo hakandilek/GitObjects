@@ -24,7 +24,7 @@ class Git {
        }
        public boolean getAllowsChildren() { return !isLeaf(); }
        public TreeNode getParent() { return parent; }
-       public java.util.Enumeration	children() { return null; }
+       public Enumeration<?> children() { return null; }
     }
     static class Blob extends Entry {
        String size;
